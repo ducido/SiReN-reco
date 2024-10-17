@@ -1,0 +1,6 @@
+*.txt
+*.pt
+*.csv
+Datasets/
+*cache*
+*.ipynb

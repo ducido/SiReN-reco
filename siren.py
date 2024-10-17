@@ -9,11 +9,11 @@ class SiReN(nn.Module):
     def __init__(self,train,num_u,num_v,offset,num_layers = 2,MLP_layers=2,dim = 64,reg=1e-4
                  ,device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")):
         super(SiReN,self).__init__()
-        self.M = num_u; self.N = num_v;
+        self.M = num_u; self.N = num_v
         self.num_layers = num_layers
         self.MLP_layers = MLP_layers
         self.device = device
-        self.reg = reg
+        self.reg = reg          
         self.embed_dim = dim
 
 
@@ -58,21 +58,23 @@ class SiReN(nn.Module):
         
     def aggregate(self):
         # Generate embeddings z_p
-        B=[]; B.append(self.E)
+        # self.E is embedding vector for positive edge
+        B=[]
+        B.append(self.E)
         x = self.convs[0](self.E,self.data_p.edge_index)
 
         B.append(x)
         for i in range(1,self.num_layers):
-            x = self.convs[i](x,self.data_p.edge_index)
-
+            x = self.convs[i](x, self.data_p.edge_index)
             B.append(x)
-        z_p = sum(B)/len(B) 
+        z_p = sum(B)/len(B) # feature of postive 
 
         # Generate embeddings z_n
+        # self.E2 is embedding vectors for negative edge
         C = []; C.append(self.E2)
         x = F.dropout(F.relu(self.mlps[0](self.E2)),p=0.5,training=self.training)
         for i in range(1,self.MLP_layers):
-            x = self.mlps[i](x);
+            x = self.mlps[i](x)
             x = F.relu(x)
             x = F.dropout(x,p=0.5,training=self.training)
             C.append(x)
@@ -88,13 +90,20 @@ class SiReN(nn.Module):
         
     
     def forward(self,u,v,w,n,device):
+        # u: user
+        # v: item + num_user
+        # w: rating - offset
+        # n: 40 item that user does not rate, (batch_size 40)
+        # user 0: [...(40)]  user 0: [...(40)]... user 1: [...(40)]
+
         emb = self.aggregate()
-        u_ = emb[u].to(device);
-        v_ = emb[v].to(device);
-        n_ = emb[n].to(device);
+        u_ = emb[u].to(device) # batch_size 64
+        v_ = emb[v].to(device)
+        n_ = emb[n].to(device) # batch_size K 64
         w_ = w.to(device)
+
         positivebatch = torch.mul(u_ , v_ ); 
-        negativebatch = torch.mul(u_.view(len(u_),1,self.embed_dim),n_)  
+        negativebatch = torch.mul(u_.view(len(u_),1,self.embed_dim),n_) # bs K 64
         sBPR_loss =  F.logsigmoid((((-1/2*torch.sign(w_)+3/2)).view(len(u_),1) * (positivebatch.sum(dim=1).view(len(u_),1))) - negativebatch.sum(dim=2)).sum(dim=1) # weight
         reg_loss = u_.norm(dim=1).pow(2).sum() + v_.norm(dim=1).pow(2).sum() + n_.norm(dim=2).pow(2).sum() 
         return -torch.sum(sBPR_loss) + self.reg * reg_loss

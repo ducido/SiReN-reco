@@ -16,6 +16,7 @@ def main(args):
     train,test = data_class.data_load();
     train = train.astype({'userId':'int64', 'movieId':'int64'})
     data_class.train = train; data_class.test = test
+
     print('loading complete! time :: %s'%(time.time()-st))
     
     
@@ -36,11 +37,12 @@ def main(args):
     training_dataset=bipartite_dataset(train,neg_dist,args.offset,data_class.num_u,data_class.num_v,args.K);
     
     for EPOCH in range(1,args.epoch+1):
-        if EPOCH%20-1==0:training_dataset.negs_gen_EP(20)
+        ep = 20
+        if EPOCH%ep-1==0:training_dataset.negs_gen_EP(ep)
             
         
         LOSS=0
-        training_dataset.edge_4 = training_dataset.edge_4_tot[:,:,EPOCH%20-1]
+        training_dataset.edge_4 = training_dataset.edge_4_tot[:,:,EPOCH%ep-1]
         
         ds = DataLoader(training_dataset,batch_size=args.batch_size,shuffle=True)
         q=0
@@ -55,15 +57,16 @@ def main(args):
             optimizer.step()
             LOSS+=loss.item() * len(ds)
             
-            pbar.update(1);
+            pbar.update(1)
             pbar.set_postfix({'loss':loss.item()})
 
         pbar.close()
+        # torch.save(model, 'model.pt')
 
-        if EPOCH%20 ==0:
 
+        if EPOCH%ep == 1:
             model.eval()
-            emb = model.aggregate();
+            emb = model.aggregate()
             emb_u, emb_v = torch.split(emb,[data_class.num_u,data_class.num_v])
             emb_u = emb_u.cpu().detach(); emb_v = emb_v.cpu().detach()
             r_hat = emb_u.mm(emb_v.t())
@@ -71,6 +74,10 @@ def main(args):
             eval_ = ev(data_class,reco,args)
             eval_.precision_and_recall()
             eval_.normalized_DCG()
+            with open('log.txt', 'a+') as f:
+                recall = eval_.r['total'][eval_.N-1][2:]
+                nDCG = eval_.nDCG['total'][eval_.N-1][2:]
+                f.write(f"epoch: {EPOCH}  recall: {recall}  nDCG: {nDCG}\n")
             print("\n***************************************************************************************")
             print(" /* Recommendation Accuracy */")
             print('N :: %s'%(eval_.N))
@@ -86,7 +93,7 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset',
                         type = str,
-                        default = 'ML-1M',
+                        default = 'ifashion',
                         help = "Dataset"
                         )
     parser.add_argument('--version',
@@ -132,7 +139,7 @@ if __name__=='__main__':
                         )
     parser.add_argument('--epoch',
                         type = int,
-                        default = 1000,
+                        default = 100,
                         help = "The number of epochs"
                         )
     parser.add_argument('--reg',
