@@ -37,7 +37,7 @@ def main(args):
     training_dataset=bipartite_dataset(train,neg_dist,args.offset,data_class.num_u,data_class.num_v,args.K);
     
     for EPOCH in range(1,args.epoch+1):
-        ep = 20
+        ep = 2
         if EPOCH%ep-1==0:training_dataset.negs_gen_EP(ep)
             
         
@@ -74,10 +74,11 @@ def main(args):
             eval_ = ev(data_class,reco,args)
             eval_.precision_and_recall()
             eval_.normalized_DCG()
-            with open('log.txt', 'a+') as f:
+            with open(f'/kaggle/working/log_{args.dataset}.txt', 'a+') as f:
                 recall = eval_.r['total'][eval_.N-1][2:]
                 nDCG = eval_.nDCG['total'][eval_.N-1][2:]
                 f.write(f"epoch: {EPOCH}  recall: {recall}  nDCG: {nDCG}\n")
+                print("done writting")
             print("\n***************************************************************************************")
             print(" /* Recommendation Accuracy */")
             print('N :: %s'%(eval_.N))

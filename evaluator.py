@@ -11,7 +11,7 @@ class evaluator():
         self.reco = reco
         self.data = data_class
         self.N = np.array(N)
-        self.threshold = 4 # to generate ground truth set
+        self.threshold = 0 # to generate ground truth set
         self.partition = partition
         
         all_items = set(np.arange(1,data_class.num_v + 1))
